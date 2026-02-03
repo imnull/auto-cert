@@ -70,6 +70,19 @@ npm run cert:deploy -- --domain example.com --upstream localhost --port 3000
 
 ## 命令参考
 
+### 初始化与配置
+
+```bash
+# 交互式初始化（推荐首次使用）
+npm run setup
+
+# 快速创建默认 config.yaml（如果不存在）
+npm run config:init
+
+# 快速添加域名记录
+npm run domain:add -- example.com
+```
+
 ### 证书管理
 
 ```bash
@@ -148,6 +161,9 @@ auto-cert/
 ├── config/                   # 配置文件
 │   ├── config.yaml           # 主配置（YAML）
 │   └── domains.yaml          # 域名配置（YAML）
+│                               #   issuedAt: 证书签发时间（首次申请成功的时间）
+│                               #   email: 申请时使用的邮箱
+│                               #   注意：不是过期时间！证书有效期为 90 天
 ├── certs/                    # 证书存储（gitignored）
 │   └── example.com/
 │       ├── privkey.pem       # 私钥
