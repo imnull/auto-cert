@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
  * 初始化配置脚本
+ * 生成 YAML 格式配置文件
  */
 
 const fs = require('fs').promises;
 const path = require('path');
+const yaml = require('js-yaml');
 const inquirer = require('inquirer');
 const chalk = require('chalk');
 const Config = require('../lib/config');
@@ -16,7 +18,7 @@ async function run() {
     {
       type: 'input',
       name: 'email',
-      message: '请输入联系邮箱（用于 Let's Encrypt 账户）:',
+      message: '请输入联系邮箱（用于 Let\'s Encrypt 账户）:',
       validate: (input) => {
         if (!input || !input.includes('@')) {
           return '请输入有效的邮箱地址';
@@ -66,12 +68,17 @@ async function run() {
   // 确保目录存在
   await config.ensureDirs();
 
-  // 保存配置
+  // 保存配置（YAML 格式）
   const configPath = await config.save();
 
   console.log(chalk.green('\n✔ 配置已保存'));
   console.log(chalk.gray(`  配置文件: ${configPath}`));
   console.log(chalk.gray(`  证书目录: ${config.certsDir}`));
+
+  // 显示配置内容预览
+  const yamlContent = await fs.readFile(configPath, 'utf8');
+  console.log(chalk.blue('\n▶ 配置预览:'));
+  console.log(chalk.gray(yamlContent.split('\n').map(l => '  ' + l).join('\n')));
 
   // 显示下一步提示
   console.log(chalk.blue('\n▶ 下一步'));

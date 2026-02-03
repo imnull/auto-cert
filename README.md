@@ -9,6 +9,7 @@
 - ✅ **自动续期** - 检测证书有效期并自动续期
 - ✅ **nginx 集成** - 自动生成符合最佳实践的 nginx 配置
 - ✅ **Git 部署友好** - 通过 Git 部署到服务器后执行
+- ✅ **YAML 配置** - 使用 YAML 格式配置文件，更易读写
 
 ## 安装
 
@@ -37,6 +38,19 @@ npm run setup
 - 是否使用测试环境
 - HTTP 验证根目录
 - nginx 配置目录
+
+配置将保存为 `config/config.yaml`：
+
+```yaml
+# auto-cert 配置文件
+challengeType: http-01
+email: admin@example.com
+logLevel: info
+nginxConfDir: /etc/nginx/conf.d
+nginxSitesDir: /etc/nginx/sites-enabled
+staging: false
+webRoot: /var/www/html
+```
 
 ### 2. 申请证书
 
@@ -97,18 +111,25 @@ auto-cert nginx-generate -d <domain> [-u <upstream>] [-p <port>]
 
 ### 配置文件
 
-`config/config.json`:
+支持 YAML 格式（`config/config.yaml`）：
 
-```json
-{
-  "email": "admin@example.com",
-  "staging": false,
-  "webRoot": "/var/www/html",
-  "challengeType": "http-01",
-  "nginxConfDir": "/etc/nginx/conf.d",
-  "logLevel": "info"
-}
+```yaml
+# auto-cert 配置文件
+email: admin@example.com
+staging: false
+webRoot: /var/www/html
+challengeType: http-01
+nginxConfDir: /etc/nginx/conf.d
+nginxSitesDir: /etc/nginx/sites-enabled
+logLevel: info
+
+# DNS 配置（使用 DNS-01 验证时）
+dnsProvider: cloudflare
+dnsCredentials:
+  apiToken: your-api-token
 ```
+
+配置优先级：命令行参数 > 环境变量 > 配置文件 > 默认值
 
 ## 项目结构
 
@@ -118,15 +139,15 @@ auto-cert/
 │   └── auto-cert.js          # CLI 入口
 ├── lib/
 │   ├── index.js              # 主类
-│   ├── config.js             # 配置管理
+│   ├── config.js             # 配置管理（YAML 支持）
 │   ├── certificate.js        # 证书管理
-│   ├── nginx.js              # nginx 管理
+│   ├── nginx.js              # nginx 部署
 │   └── challenges/
 │       ├── http-01.js        # HTTP-01 验证
 │       └── dns-01.js         # DNS-01 验证
 ├── config/                   # 配置文件
-│   ├── config.json           # 主配置
-│   └── domains.json          # 域名配置
+│   ├── config.yaml           # 主配置（YAML）
+│   └── domains.yaml          # 域名配置（YAML）
 ├── certs/                    # 证书存储（gitignored）
 │   └── example.com/
 │       ├── privkey.pem       # 私钥
