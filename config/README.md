@@ -70,7 +70,7 @@ example.com:
 remote.example.com:
   issuedAt: '2026-02-04T10:00:00.000Z'
   email: admin@example.com
-  webRoot: /var/www/html                   # 本地 webRoot（SSH 模式可不设置）
+  # webRoot: /var/www/html                # SSH 模式下可不设置，使用 ssh.remoteWebRoot
   
   # SSH 远程配置
   ssh:
@@ -80,10 +80,10 @@ remote.example.com:
     privateKey: ~/.ssh/id_rsa              # 私钥路径（默认 ~/.ssh/id_rsa）
     # 或 password: xxxxxx                  # 密码登录（不推荐）
     
-    # 远程服务器上的路径配置
-    remoteWebRoot: /var/www/html           # 远程 web 根目录
-    remoteNginxConfDir: /etc/nginx/conf.d  # 远程 nginx 配置目录
-    remoteCertsDir: /opt/auto-cert/certs   # 远程证书存放目录
+    # 远程路径配置
+    remoteWebRoot: /var/www/html           # 远程 web 根目录（HTTP-01 验证用）
+    remoteNginxConfDir: /etc/nginx/conf.d  # 远程 nginx 配置目录（deploy 必需，用于上传配置文件）
+    remoteCertsDir: /opt/auto-cert/certs   # 远程证书存放目录（格式: cert.pem + cert.key）
 ```
 
 **SSH 模式工作流程**：
