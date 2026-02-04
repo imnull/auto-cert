@@ -46,6 +46,7 @@ program
   .option('--staging', '使用 Let\'s Encrypt 测试环境', false)
   .option('-t, --type <type>', '验证类型 (http-01|dns-01)', 'http-01')
   .option('-w, --webroot <path>', 'HTTP 验证根目录')
+  .option('--no-cleanup', '验证完成后不清理验证文件（调试用）')
   .option('--dns-provider <provider>', 'DNS 服务商 (cloudflare|aliyun|aws)')
   .action(async (options) => {
     try {
@@ -61,7 +62,8 @@ program
       const result = await autoCert.issue(options.domain, {
         challengeType: options.type,
         webRoot: options.webroot,
-        dnsProvider: options.dnsProvider
+        dnsProvider: options.dnsProvider,
+        cleanup: options.cleanup !== false
       });
       
       console.log(chalk.green('\n✔ 证书申请成功'));
