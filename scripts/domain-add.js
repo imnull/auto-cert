@@ -75,8 +75,8 @@ async function saveDomains(domains) {
 # 由 auto-cert 自动生成
 #
 # 说明:
-#   issuedAt: 记录创建时间
-#   email:    申请时使用的邮箱
+#   issuedAt: 证书签发时间（由 cert:issue 自动更新，申请前为空）
+#   email:    申请时使用的邮箱（由 cert:issue 自动更新）
 #   webRoot:  该域名的独立 web 根目录（覆盖全局配置）
 #
 # 配置优先级（从高到低）:
@@ -112,7 +112,8 @@ async function run() {
   // 检查是否已存在
   if (domains[domain]) {
     console.log(chalk.yellow('\n⊙ 域名记录已存在'));
-    console.log(chalk.gray(`  签发时间: ${domains[domain].issuedAt}`));
+    const issuedAt = domains[domain].issuedAt;
+    console.log(chalk.gray(`  签发时间: ${issuedAt || '（尚未申请证书）'}`));
     if (domains[domain].webRoot) {
       console.log(chalk.gray(`  Web 根目录: ${domains[domain].webRoot}`));
     }
@@ -136,8 +137,9 @@ async function run() {
   }
 
   // 添加新记录
+  // issuedAt 在证书申请成功后由 cert:issue 自动更新
   domains[domain] = {
-    issuedAt: new Date().toISOString(),
+    issuedAt: '', // 申请成功前为空
     email: '',
     ...(webRoot && { webRoot }) // 如果有指定 webRoot 则添加
   };
