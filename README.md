@@ -271,7 +271,60 @@ cd $TARGET && npm install
    - HTTP-01 验证需要服务器 80 端口可访问
    - 或使用 DNS-01 验证（需要 DNS 服务商 API）
 
-3. **测试环境**：
+3. **HTTP-01 验证流程**：
+
+   HTTP-01 验证需要 Let's Encrypt 服务器能够访问你的服务器：
+
+   ```
+   1. auto-cert 在本地创建验证文件
+      → {webRoot}/.well-known/acme-challenge/xxx
+
+   2. Let's Encrypt 服务器访问
+      → http://your-domain/.well-known/acme-challenge/xxx
+
+   3. 如果返回正确内容 → 验证通过 ✅
+      如果返回 404 → 验证失败 ❌
+   ```
+
+   **nginx 必须配置 80 端口的 `.well-known` 路径**：
+
+   ```nginx
+   server {
+       listen 80;
+       server_name your-domain.com;
+
+       # ACME 挑战 - 必须配置！
+       location /.well-known/acme-challenge/ {
+           alias /usr/local/etc/nginx/www/html/.well-known/acme-challenge/;
+       }
+
+       location / {
+           return 301 https://$server_name$request_uri;
+       }
+   }
+   ```
+
+   **验证前测试**：
+
+   ```bash
+   # 1. 创建测试文件
+   echo "test-content" | sudo tee /usr/local/etc/nginx/www/html/.well-known/acme-challenge/test
+
+   # 2. 本地测试访问
+   curl http://your-domain/.well-known/acme-challenge/test
+   # 应该输出: test-content
+
+   # 3. 测试通过后删除
+   rm /usr/local/etc/nginx/www/html/.well-known/acme-challenge/test
+   ```
+
+   **常见 404 原因**：
+   - 80 端口未开放（防火墙/安全组）
+   - nginx 未配置 `.well-known` 路径
+   - `webRoot` 路径与 nginx `alias` 不匹配
+   - 路径权限问题
+
+4. **测试环境**：
    - 开发测试时添加 `--staging` 参数
    - 避免触发生产环境速率限制
 
