@@ -45,7 +45,7 @@ program
   .option('-e, --email <email>', '联系邮箱')
   .option('--staging', '使用 Let\'s Encrypt 测试环境', false)
   .option('-t, --type <type>', '验证类型 (http-01|dns-01)', 'http-01')
-  .option('-w, --webroot <path>', 'HTTP 验证根目录', '/var/www/html')
+  .option('-w, --webroot <path>', 'HTTP 验证根目录')
   .option('--dns-provider <provider>', 'DNS 服务商 (cloudflare|aliyun|aws)')
   .action(async (options) => {
     try {
@@ -55,6 +55,7 @@ program
       console.log(chalk.blue('\n▶ 开始申请证书'));
       console.log(chalk.gray(`  域名: ${options.domain}`));
       console.log(chalk.gray(`  验证方式: ${options.type}`));
+      console.log(chalk.gray(`  Web 根目录: ${config.webRoot}`));
       console.log(chalk.gray(`  环境: ${options.staging ? 'Staging (测试)' : 'Production (生产)'}`));
       
       const result = await autoCert.issue(options.domain, {
@@ -179,23 +180,26 @@ program
   .requiredOption('-d, --domain <domain>', '域名')
   .option('-u, --upstream <host>', '上游服务器地址', 'localhost')
   .option('-p, --port <port>', '上游服务器端口', '3000')
-  .option('-w, --webroot <path>', 'Web 根目录', '/var/www/html')
-  .option('--conf-dir <path>', 'nginx 配置目录', '/etc/nginx/conf.d')
+  .option('-w, --webroot <path>', 'Web 根目录')
+  .option('--conf-dir <path>', 'nginx 配置目录')
   .option('--no-backup', '不备份现有配置')
   .option('--no-reload', '部署后不重载 nginx')
   .action(async (options) => {
     try {
-      const autoCert = new AutoCert({});
+      const config = await loadConfig(options);
+      const autoCert = new AutoCert(config);
       
       console.log(chalk.blue('\n▶ 部署证书到 nginx'));
       console.log(chalk.gray(`  域名: ${options.domain}`));
-      console.log(chalk.gray(`  上游: ${options.upstream}:${options.port}`));
+      console.log(chalk.gray(`  上游: ${options.upstream || 'localhost'}:${options.port || 3000}`));
+      console.log(chalk.gray(`  Web 根目录: ${config.webRoot}`));
+      console.log(chalk.gray(`  nginx 配置目录: ${config.nginxConfDir}`));
       
       const result = await autoCert.deploy(options.domain, {
         upstream: options.upstream,
-        upstreamPort: parseInt(options.port),
+        upstreamPort: parseInt(options.port || 3000),
         webRoot: options.webroot,
-        nginxConfDir: options.confDir,
+        nginxConfDir: options.confDir || config.nginxConfDir,
         backup: options.backup,
         reload: options.reload
       });
@@ -261,20 +265,21 @@ program
   .command('nginx-generate')
   .description('生成 nginx 配置（输出到 stdout）')
   .requiredOption('-d, --domain <domain>', '域名')
-  .option('-u, --upstream <host>', '上游服务器地址', 'localhost')
-  .option('-p, --port <port>', '上游服务器端口', '3000')
-  .option('-w, --webroot <path>', 'Web 根目录', '/var/www/html')
+  .option('-u, --upstream <host>', '上游服务器地址')
+  .option('-p, --port <port>', '上游服务器端口')
+  .option('-w, --webroot <path>', 'Web 根目录')
   .action(async (options) => {
     try {
-      const autoCert = new AutoCert({});
-      const config = await autoCert.generateNginxConfig({
+      const config = await loadConfig(options);
+      const autoCert = new AutoCert(config);
+      const nginxConfig = await autoCert.generateNginxConfig({
         domain: options.domain,
         upstream: options.upstream,
-        upstreamPort: parseInt(options.port),
+        upstreamPort: parseInt(options.port || 3000),
         webRoot: options.webroot
       });
       
-      console.log(config);
+      console.log(nginxConfig);
     } catch (err) {
       handleError(err);
     }
