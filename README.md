@@ -220,15 +220,297 @@ kimi-cli skills install nodejs-master.skill
 
 可忽略 `nodejs-master/` 目录，直接阅读本 README 使用 auto-cert 即可。
 
-## SSL 配置
+## nginx 部署详解
 
-生成的 nginx 配置包含以下安全特性：
+### 部署逻辑
 
-- **TLS 1.2 / TLS 1.3** 协议
-- **强加密套件**（前向安全）
-- **HSTS**（HTTP Strict Transport Security）
-- **OCSP Stapling**
-- **安全响应头**（X-Frame-Options, X-Content-Type-Options 等）
+auto-cert 的部署命令 (`npm run cert:deploy`) 会智能处理 nginx 配置，遵循以下逻辑：
+
+#### 1. 检查现有配置
+
+部署前会自动检查目标配置文件是否存在：
+
+```bash
+# 本地部署检查
+/etc/nginx/conf.d/{domain}.conf
+
+# 远程部署检查
+{remoteNginxConfDir}/{domain}.conf
+```
+
+#### 2. 三种处理场景
+
+| 场景 | 处理方式 | 说明 |
+|------|----------|------|
+| **无现有配置** | 创建全新配置 | 生成完整的 HTTP + HTTPS server 块 |
+| **只有 HTTP 配置** | **智能转换** | 保留原有 HTTP 配置，添加 HTTPS server 块 |
+| **已有 HTTPS 配置** | 直接跳过 | 不做任何修改，避免覆盖用户自定义配置 |
+
+#### 3. 智能转换示例
+
+假设你已有以下 HTTP 配置：
+
+```nginx
+# /etc/nginx/conf.d/example.conf
+server {
+    listen 80;
+    server_name example.com;
+    
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+    
+    location /api {
+        proxy_pass http://localhost:3000;
+    }
+}
+```
+
+执行部署后，会自动添加 HTTPS 配置：
+
+```nginx
+# /etc/nginx/conf.d/example.conf
+server {
+    listen 80;
+    server_name example.com;
+    
+    # ACME 验证路径（自动添加）
+    location /.well-known/acme-challenge/ {
+        alias /var/www/html/.well-known/acme-challenge/;
+    }
+    
+    # 保留原有所有 location
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+    
+    location /api {
+        proxy_pass http://localhost:3000;
+    }
+}
+
+# 自动添加的 HTTPS 配置
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name example.com;
+    
+    # SSL 证书（使用 fullchain.pem 包含完整证书链）
+    ssl_certificate /etc/nginx/certs/example.com/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/example.com/privkey.pem;
+    
+    # SSL 安全配置
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    
+    # 安全响应头
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    
+    # 保留原有的 location 配置
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+    
+    location /api {
+        proxy_pass http://localhost:3000;
+    }
+}
+```
+
+**注意**：
+- 原有的 HTTP 配置完全保留
+- 所有 `location` 配置自动复制到 HTTPS server
+- 仅添加 SSL 相关配置和 ACME 验证路径
+- 不会修改你的任何自定义配置
+
+### 证书文件说明
+
+部署后证书文件存放在以下位置：
+
+**本地模式**：
+```
+./certs/{domain}/
+├── privkey.pem    # 私钥（权限 600）
+├── cert.pem       # 服务器证书
+├── chain.pem      # 中间证书链
+└── fullchain.pem  # 证书 + 中间证书（推荐用于 nginx）
+```
+
+**远程模式**：
+```
+{remoteCertsDir}/{domain}/
+├── privkey.pem
+├── cert.pem
+├── chain.pem
+└── fullchain.pem
+```
+
+### 为什么使用 fullchain.pem？
+
+**证书链结构**：
+```
+根证书 (ISRG Root X1) [系统内置]
+    ↓ 签名
+中间证书 (R3) [包含在 fullchain.pem]
+    ↓ 签名
+服务器证书 [包含在 fullchain.pem]
+```
+
+nginx 配置必须使用 `fullchain.pem`：
+
+```nginx
+# ✅ 正确 - 包含完整证书链
+ssl_certificate /etc/nginx/certs/example.com/fullchain.pem;
+ssl_certificate_key /etc/nginx/certs/example.com/privkey.pem;
+
+# ❌ 错误 - 缺少中间证书，会导致证书信任警告
+ssl_certificate /etc/nginx/certs/example.com/cert.pem;
+```
+
+使用 `cert.pem` 可能导致：
+- 浏览器显示"证书不受信任"
+- 部分客户端无法建立 HTTPS 连接
+- SSL 检测工具报告证书链不完整
+
+### 部署命令详解
+
+#### 基础部署
+
+```bash
+# 部署指定域名的证书和 nginx 配置
+npm run cert:deploy -- --domain example.com
+```
+
+#### 强制部署
+
+如果 `autoDeploy` 配置为 `false`，需要加 `--force`：
+
+```bash
+npm run cert:deploy -- --domain example.com --force
+```
+
+#### 指定上游服务器
+
+```bash
+# 指定后端应用地址（默认 localhost:3000）
+npm run cert:deploy -- --domain example.com --upstream 127.0.0.1 --port 8080
+```
+
+#### 自定义配置路径
+
+```bash
+# 指定 nginx 配置目录（默认 /etc/nginx/conf.d）
+npm run cert:deploy -- --domain example.com --conf-dir /usr/local/etc/nginx/conf.d
+```
+
+#### 跳过备份和重载
+
+```bash
+# 不备份现有配置
+npm run cert:deploy -- --domain example.com --no-backup
+
+# 不重载 nginx（仅更新配置）
+npm run cert:deploy -- --domain example.com --no-reload
+
+# 两者都跳过
+npm run cert:deploy -- --domain example.com --no-backup --no-reload
+```
+
+### 手动配置 nginx（可选）
+
+如果自动部署不符合需求，可以手动配置：
+
+#### 1. 仅生成配置（不部署）
+
+```bash
+npm run nginx:generate -- --domain example.com
+```
+
+输出示例：
+```nginx
+server {
+    listen 80;
+    server_name example.com;
+    
+    location /.well-known/acme-challenge/ {
+        alias /var/www/html/.well-known/acme-challenge/;
+    }
+    
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name example.com;
+    
+    ssl_certificate /etc/nginx/certs/example.com/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/example.com/privkey.pem;
+    
+    # ... SSL 配置
+    
+    location / {
+        proxy_pass http://localhost:3000;
+    }
+}
+```
+
+#### 2. 手动复制到服务器
+
+```bash
+# 本地生成配置重定向到文件
+npm run nginx:generate -- --domain example.com > /tmp/example.conf
+
+# 上传到远程服务器
+scp /tmp/example.conf root@server:/etc/nginx/conf.d/
+
+# 测试并重载 nginx
+ssh root@server "nginx -t && nginx -s reload"
+```
+
+#### 3. 手动上传证书
+
+```bash
+# 使用 scp 上传证书
+scp -r certs/example.com root@server:/etc/nginx/certs/
+
+# 设置权限
+ssh root@server "chmod 600 /etc/nginx/certs/example.com/privkey.pem"
+```
+
+### SSL 配置最佳实践
+
+generated nginx 配置包含以下安全特性：
+
+- **TLS 1.2 / TLS 1.3** 协议（禁用旧版 TLS 1.0/1.1）
+- **强加密套件**（前向安全，兼容性和安全性平衡）
+- **HSTS**（HTTP Strict Transport Security，强制 HTTPS）
+- **安全响应头**：
+  - `X-Frame-Options: SAMEORIGIN`（防止点击劫持）
+  - `X-Content-Type-Options: nosniff`（防止 MIME 嗅探）
+  - `X-XSS-Protection: 1; mode=block`（XSS 防护）
+  - `Referrer-Policy: strict-origin-when-cross-origin`（隐私保护）
+- **SSL Session 缓存**（提升性能）
+
+**注意**：配置默认不包含 `ssl_stapling on`，因为 Let's Encrypt 证书的 OCSP URL 有时会导致警告。如需启用，请手动添加：
+
+```nginx
+ssl_stapling on;
+ssl_stapling_verify on;
+ssl_trusted_certificate /etc/nginx/certs/example.com/chain.pem;
+```
 
 ## 部署工作流
 
