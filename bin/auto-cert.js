@@ -28,11 +28,13 @@ function handleError(err) {
 // 辅助函数：加载配置
 async function loadConfig(options) {
   const config = require('../lib/config');
-  return config.load({
-    email: options.email,
-    staging: options.staging,
-    ...options
-  });
+  
+  // 过滤掉 undefined 值，避免覆盖配置文件
+  const cleanOptions = Object.fromEntries(
+    Object.entries(options).filter(([_, v]) => v !== undefined)
+  );
+  
+  return config.load(cleanOptions);
 }
 
 // issue - 申请证书
