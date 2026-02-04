@@ -45,7 +45,6 @@ program
   .option('-e, --email <email>', '联系邮箱')
   .option('--staging', '使用 Let\'s Encrypt 测试环境', false)
   .option('-t, --type <type>', '验证类型 (http-01|dns-01)', 'http-01')
-  .option('-w, --webroot <path>', 'HTTP 验证根目录')
   .option('--no-cleanup', '验证完成后不清理验证文件（调试用）')
   .option('--dns-provider <provider>', 'DNS 服务商 (cloudflare|aliyun|aws)')
   .action(async (options) => {
@@ -56,12 +55,10 @@ program
       console.log(chalk.blue('\n▶ 开始申请证书'));
       console.log(chalk.gray(`  域名: ${options.domain}`));
       console.log(chalk.gray(`  验证方式: ${options.type}`));
-      console.log(chalk.gray(`  Web 根目录: ${config.webRoot}`));
       console.log(chalk.gray(`  环境: ${options.staging ? 'Staging (测试)' : 'Production (生产)'}`));
       
       const result = await autoCert.issue(options.domain, {
         challengeType: options.type,
-        webRoot: options.webroot,
         dnsProvider: options.dnsProvider,
         cleanup: options.cleanup !== false
       });
@@ -182,7 +179,6 @@ program
   .requiredOption('-d, --domain <domain>', '域名')
   .option('-u, --upstream <host>', '上游服务器地址', 'localhost')
   .option('-p, --port <port>', '上游服务器端口', '3000')
-  .option('-w, --webroot <path>', 'Web 根目录')
   .option('--conf-dir <path>', 'nginx 配置目录')
   .option('--no-backup', '不备份现有配置')
   .option('--no-reload', '部署后不重载 nginx')
@@ -233,12 +229,12 @@ program
       
       if (isRemote) {
         console.log(chalk.cyan(`  模式: SSH 远程部署 (${domainConfig.ssh.host})`));
-        console.log(chalk.gray(`  远程 Web 根目录: ${domainConfig.ssh.remoteWebRoot || domainConfig.webRoot || config.webRoot}`));
-        console.log(chalk.gray(`  远程 nginx 配置: ${domainConfig.ssh.remoteNginxConfDir || '/etc/nginx/conf.d'}`));
+        console.log(chalk.gray(`  远程 Web 根目录: ${domainConfig.ssh?.remoteWebRoot || '/var/www/html'}`));
+        console.log(chalk.gray(`  远程 nginx 配置: ${domainConfig.ssh?.remoteNginxConfDir || '/etc/nginx/conf.d'}`));
       } else {
-        console.log(chalk.gray(`  模式: 本地部署`));
-        console.log(chalk.gray(`  Web 根目录: ${options.webroot || domainConfig.webRoot || config.webRoot}`));
-        console.log(chalk.gray(`  nginx 配置目录: ${options.confDir || config.nginxConfDir}`));
+        console.log(chalk.red(`  错误: 未配置 SSH，无法部署`));
+        console.log(chalk.gray('  请在 domains.yaml 中配置 ssh 选项'));
+        process.exit(1);
       }
       
       console.log(chalk.gray(`  上游: ${options.upstream || 'localhost'}:${options.port || 3000}`));
@@ -246,8 +242,7 @@ program
       const result = await autoCert.deploy(options.domain, {
         upstream: options.upstream,
         upstreamPort: parseInt(options.port || 3000),
-        webRoot: options.webroot,
-        nginxConfDir: options.confDir || config.nginxConfDir,
+        nginxConfDir: options.confDir,
         backup: options.backup,
         reload: options.reload
       });
@@ -315,16 +310,20 @@ program
   .requiredOption('-d, --domain <domain>', '域名')
   .option('-u, --upstream <host>', '上游服务器地址')
   .option('-p, --port <port>', '上游服务器端口')
-  .option('-w, --webroot <path>', 'Web 根目录')
   .action(async (options) => {
     try {
       const config = await loadConfig(options);
       const autoCert = new AutoCert(config);
+      
+      // 获取域名配置
+      const domainConfig = await autoCert.getDomainConfig(options.domain);
+      const remoteWebRoot = domainConfig.ssh?.remoteWebRoot || '/var/www/html';
+      
       const nginxConfig = await autoCert.generateNginxConfig({
         domain: options.domain,
         upstream: options.upstream,
         upstreamPort: parseInt(options.port || 3000),
-        webRoot: options.webroot
+        webRoot: remoteWebRoot
       });
       
       console.log(nginxConfig);
