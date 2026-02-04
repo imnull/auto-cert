@@ -88,3 +88,7 @@ test/fixtures/
 # 本地配置文件（可能包含敏感信息）
 config/config.local.json
 config/domains.local.json
+
+# YAML 配置文件（包含邮箱、路径等本地配置）
+config/*.yaml
+config/*.yml
