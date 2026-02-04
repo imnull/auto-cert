@@ -85,11 +85,12 @@ async function run() {
   }
 
   // 添加新记录
-  // issuedAt 是"签发时间"，表示证书首次申请成功的时间
-  // 不是过期时间！Let's Encrypt 证书有效期为 90 天
+  // issuedAt: 添加域名记录的日期时间（ISO 格式）
+  // 注意：这不是证书签发时间，只是记录创建时间
+  // 实际证书有效期需要通过 cert:check 命令查看
   domains[domain] = {
-    issuedAt: null,  // 首次申请时会更新为实际时间
-    email: ''        // 申请时会填入实际邮箱
+    issuedAt: new Date().toISOString(),  // 添加当天时间
+    email: ''                            // 申请时会填入实际邮箱
   };
 
   // 保存
