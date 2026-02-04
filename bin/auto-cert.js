@@ -189,11 +189,24 @@ program
       const config = await loadConfig(options);
       const autoCert = new AutoCert(config);
       
+      // 获取域名配置，检查是否为远程模式
+      const domainConfig = await autoCert.getDomainConfig(options.domain);
+      const isRemote = !!domainConfig.ssh;
+      
       console.log(chalk.blue('\n▶ 部署证书到 nginx'));
       console.log(chalk.gray(`  域名: ${options.domain}`));
+      
+      if (isRemote) {
+        console.log(chalk.cyan(`  模式: SSH 远程部署 (${domainConfig.ssh.host})`));
+        console.log(chalk.gray(`  远程 Web 根目录: ${domainConfig.ssh.remoteWebRoot || domainConfig.webRoot || config.webRoot}`));
+        console.log(chalk.gray(`  远程 nginx 配置: ${domainConfig.ssh.remoteNginxConfDir || '/etc/nginx/conf.d'}`));
+      } else {
+        console.log(chalk.gray(`  模式: 本地部署`));
+        console.log(chalk.gray(`  Web 根目录: ${options.webroot || domainConfig.webRoot || config.webRoot}`));
+        console.log(chalk.gray(`  nginx 配置目录: ${options.confDir || config.nginxConfDir}`));
+      }
+      
       console.log(chalk.gray(`  上游: ${options.upstream || 'localhost'}:${options.port || 3000}`));
-      console.log(chalk.gray(`  Web 根目录: ${config.webRoot}`));
-      console.log(chalk.gray(`  nginx 配置目录: ${config.nginxConfDir}`));
       
       const result = await autoCert.deploy(options.domain, {
         upstream: options.upstream,

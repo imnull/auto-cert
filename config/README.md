@@ -7,7 +7,7 @@
 `config/` 目录包含 auto-cert 运行所需的全部配置信息：
 
 - **主配置** (`config.yaml`) - ACME 账户、验证方式、nginx 路径等
-- **域名配置** (`domains.yaml`) - 已管理的域名列表及元数据
+- **域名配置** (`domains.yaml`) - 已管理的域名列表及独立配置（含 SSH 远程配置）
 - **账户密钥** (`accounts/`) - Let's Encrypt 账户私钥（敏感）
 
 ## 文件说明
@@ -53,46 +53,75 @@ npm run config:init
 
 ### domains.yaml
 
-域名记录文件，记录已管理的域名及其独立配置：
+域名记录文件，支持**本地模式**和**SSH 远程模式**：
+
+#### 本地模式（默认）
 
 ```yaml
 example.com:
-  issuedAt: '2026-02-04T10:00:00.000Z'     # 记录创建时间
+  issuedAt: '2026-02-04T10:00:00.000Z'     # 证书签发时间（自动更新）
   email: admin@example.com                 # 申请时使用的邮箱
   webRoot: /var/www/example-com            # 该域名的独立 webRoot（可选）
-
-www.example.com:
-  issuedAt: '2026-02-04T10:30:00.000Z'
-  email: admin@example.com
-  webRoot: /var/www/www-example-com        # 每个域名可有不同的 webRoot
 ```
 
-**配置优先级**：
-1. 命令行参数 `--webroot`
-2. 域名配置中的 `webRoot`（domains.yaml）
-3. 全局配置中的 `webRoot`（config.yaml）
-4. 默认值 `/var/www/html`
+#### SSH 远程模式
+
+```yaml
+remote.example.com:
+  issuedAt: '2026-02-04T10:00:00.000Z'
+  email: admin@example.com
+  webRoot: /var/www/html                   # 本地 webRoot（SSH 模式可不设置）
+  
+  # SSH 远程配置
+  ssh:
+    host: remote.example.com               # 远程服务器地址
+    port: 22                               # SSH 端口（默认 22）
+    username: root                         # 登录用户名
+    privateKey: ~/.ssh/id_rsa              # 私钥路径（默认 ~/.ssh/id_rsa）
+    # 或 password: xxxxxx                  # 密码登录（不推荐）
+    
+    # 远程服务器上的路径配置
+    remoteWebRoot: /var/www/html           # 远程 web 根目录
+    remoteNginxConfDir: /etc/nginx/conf.d  # 远程 nginx 配置目录
+    remoteCertsDir: /opt/auto-cert/certs   # 远程证书存放目录
+```
+
+**SSH 模式工作流程**：
+
+```
+1. 本地运行 auto-cert
+2. 通过 SSH 连接到远程服务器
+3. 在远程服务器上创建验证文件（HTTP-01）
+4. 等待 Let's Encrypt 验证
+5. 下载证书到本地
+6. 上传证书到远程服务器
+7. 生成并上传 nginx 配置
+8. 远程重载 nginx
+```
 
 **生成方式**：
 ```bash
-# 快速添加域名记录
+# 添加本地域名
 npm run domain:add -- example.com
 
-# 申请证书时自动更新
-npm run cert:issue -- --domain example.com
+# 添加带独立 webRoot 的域名
+npm run domain:add -- example.com /var/www/example-com
+
+# SSH 远程域名需要手动编辑 domains.yaml 添加 ssh 配置
 ```
 
-### accounts/
+### domains.yaml 配置优先级
 
-存储 Let's Encrypt ACME 账户私钥：
+| 优先级 | 来源 | 说明 |
+|--------|------|------|
+| 1 | 命令行 `--webroot` | 临时覆盖 |
+| 2 | domains.yaml `webRoot` | 该域名的独立配置 |
+| 3 | config.yaml `webRoot` | 全局默认值 |
+| 4 | 内置默认值 | `/var/www/html` |
 
-```
-accounts/
-├── admin_example_com_prod.pem    # 生产环境账户
-└── admin_example_com_staging.pem # 测试环境账户
-```
-
-⚠️ **重要**：此目录包含敏感密钥文件，已添加到 `.gitignore`，请勿提交到版本控制。
+**SSH 远程模式优先级**：
+- 如果配置了 `ssh`，优先使用 `ssh.remoteWebRoot`
+- 如果未配置 `ssh.remoteWebRoot`，使用普通优先级
 
 ## 文件规范
 
@@ -110,13 +139,11 @@ accounts/
 | `domains.yaml` | 否 | 自动创建/更新 |
 | `accounts/*.pem` | 是 | 首次运行时自动生成 |
 
-### 优先级
+### 配置优先级（全局）
 
-配置优先级（从高到低）：
-
-1. 命令行参数（如 `--email`, `--staging`）
+1. 命令行参数（如 `--email`, `--staging`, `--webroot`）
 2. 环境变量（如 `AUTO_CERT_EMAIL`）
-3. 配置文件（`config.yaml`）
+3. 配置文件（`config.yaml` / `domains.yaml`）
 4. 默认值
 
 ## 安全须知
@@ -124,7 +151,7 @@ accounts/
 ⚠️ **本目录包含敏感信息**：
 
 - `config.yaml` - 包含邮箱地址
-- `domains.yaml` - 包含域名列表
+- `domains.yaml` - 包含域名列表，**SSH 配置包含服务器登录信息**
 - `accounts/*.pem` - ACME 账户私钥
 
 **已添加到 `.gitignore`**：
@@ -135,6 +162,14 @@ config/accounts/
 ```
 
 请勿手动将这些文件提交到 Git 仓库！
+
+### SSH 密钥安全
+
+如果使用 SSH 远程模式：
+- 使用私钥登录（推荐）
+- 私钥文件权限应设置为 `600`
+- 不要在 `domains.yaml` 中硬编码密码
+- 考虑使用 SSH agent 管理密钥
 
 ## 备份建议
 
@@ -188,3 +223,24 @@ npm run setup
 ```bash
 npm run cert:issue -- --domain example.com --email other@example.com
 ```
+
+### Q: SSH 远程模式需要哪些前提条件？
+
+1. 本地可以通过 SSH 登录远程服务器
+2. 远程服务器已安装 nginx
+3. 远程服务器 80 端口可访问（HTTP-01 验证）
+4. 远程服务器有写入 nginx 配置目录的权限
+
+测试 SSH 连接：
+```bash
+ssh -i ~/.ssh/id_rsa root@remote.example.com "echo '连接成功'"
+```
+
+### Q: SSH 模式和本地模式的区别？
+
+| 特性 | 本地模式 | SSH 远程模式 |
+|------|----------|--------------|
+| 验证文件位置 | 本地文件系统 | 远程服务器 |
+| nginx 配置位置 | 本地 | 远程服务器 |
+| 证书存储位置 | 本地 `certs/` | 本地 + 远程 |
+| 适用场景 | 单服务器 | 多服务器/跳板机 |

@@ -261,6 +261,91 @@ git --work-tree=$TARGET checkout -f
 cd $TARGET && npm install
 ```
 
+## SSH 远程模式
+
+auto-cert 支持通过 SSH 在远程服务器上申请和部署证书，适用于以下场景：
+
+- 本地跳板机管理多台远程服务器
+- 证书服务器与 Web 服务器分离
+- 内网服务器通过有公网 IP 的跳板机申请证书
+
+### 配置方法
+
+编辑 `config/domains.yaml` 添加 SSH 配置：
+
+```yaml
+remote.example.com:
+  issuedAt: ''
+  email: admin@example.com
+  
+  # SSH 远程配置
+  ssh:
+    host: remote-server.com          # 远程服务器地址
+    port: 22                         # SSH 端口（默认 22）
+    username: root                   # 登录用户名
+    privateKey: ~/.ssh/id_rsa        # 私钥路径（默认 ~/.ssh/id_rsa）
+    # 或使用密码登录（不推荐）
+    # password: your-password
+    
+    # 远程服务器路径配置
+    remoteWebRoot: /var/www/html                    # 远程 web 根目录
+    remoteNginxConfDir: /etc/nginx/conf.d           # 远程 nginx 配置目录
+    remoteCertsDir: /opt/auto-cert/certs            # 远程证书存放目录
+```
+
+### 工作流程
+
+```
+┌─────────┐                    ┌─────────────────┐
+│  本地   │ ─── SSH 连接 ────▶ │   远程服务器    │
+│         │                    │                 │
+│ 申请证书 │ ── 在远程创建 ───▶ │ 验证文件        │
+│         │    验证文件        │ .well-known/    │
+│         │                    │                 │
+│ 下载证书 │ ◀── 验证通过 ─────│ Let's Encrypt   │
+│         │                    │ 访问验证        │
+│         │                    │                 │
+│ 上传证书 │ ─── SCP/SFTP ───▶ │ 证书文件        │
+│         │                    │                 │
+│ 部署配置 │ ─── 远程执行 ────▶ │ nginx 配置      │
+│         │                    │ nginx -s reload │
+└─────────┘                    └─────────────────┘
+```
+
+### 使用方式
+
+```bash
+# 1. 添加域名时配置 SSH（手动编辑 domains.yaml）
+
+# 2. 申请证书（会自动使用 SSH 远程模式）
+npm run cert:issue -- --domain remote.example.com
+
+# 3. 部署到远程 nginx
+npm run cert:deploy -- --domain remote.example.com
+```
+
+### SSH 密钥配置
+
+确保本地可以通过 SSH 免密登录远程服务器：
+
+```bash
+# 生成密钥对（如果没有）
+ssh-keygen -t rsa -b 4096 -C "auto-cert"
+
+# 复制公钥到远程服务器
+ssh-copy-id -i ~/.ssh/id_rsa.pub root@remote-server.com
+
+# 测试免密登录
+ssh root@remote-server.com "echo '连接成功'"
+```
+
+### 安全建议
+
+- 使用 SSH 密钥登录，避免密码
+- 私钥文件权限设置为 `600`
+- 使用专用账户（非 root），并配置 sudo 免密
+- 考虑使用 SSH agent 管理密钥
+
 ## 注意事项
 
 1. **权限**：
