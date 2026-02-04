@@ -171,11 +171,54 @@ auto-cert/
 │       ├── chain.pem         # 中间证书
 │       └── fullchain.pem     # 完整证书链
 ├── scripts/
-│   └── setup.js              # 初始化脚本
+│   ├── setup.js              # 交互式初始化
+│   ├── config-init.js        # 快速创建默认配置
+│   └── domain-add.js         # 快速添加域名记录
+├── nodejs-master/            # Kimi CLI Skill（开发工具）
+│   ├── SKILL.md              # 技能文档
+│   ├── references/           # ACME/nginx 参考资料
+│   ├── scripts/              # 代码模板
+│   └── assets/               # 项目模板
+├── nodejs-master.skill       # 打包后的 Skill 文件
 ├── package.json
 ├── README.md
 └── .gitignore
 ```
+
+## 关于 Kimi CLI Skill
+
+本项目包含一个 **Kimi Code CLI Skill** (`nodejs-master/`)，用于帮助 Kimi CLI 用户开发类似的 Node.js 证书管理工具。
+
+### 什么是 Skill？
+
+Skill 是 Kimi Code CLI 的扩展机制，包含：
+- **领域知识**：ACME 协议详解、nginx 最佳实践
+- **代码模板**：可复用的脚本实现
+- **工作流指导**：证书申请/部署的完整流程
+
+### 适用人群
+
+| 用户类型 | 是否需要关注 |
+|----------|--------------|
+| 只使用 auto-cert | ❌ 不需要，直接安装使用即可 |
+| 想开发类似工具 | ✅ 可安装此 Skill 获取指导 |
+| Kimi CLI 用户 | ✅ 可安装增强相关开发能力 |
+
+### 安装 Skill
+
+```bash
+# 从本仓库安装
+kimi-cli skills install ./nodejs-master/
+
+# 或打包后安装
+kimi-cli skills install nodejs-master.skill
+```
+
+安装后，当你在 Kimi CLI 中询问 Node.js 证书相关问题时，会自动触发此 Skill 提供专业指导。
+
+### 非 Kimi CLI 用户
+
+可忽略 `nodejs-master/` 目录，直接阅读本 README 使用 auto-cert 即可。
 
 ## SSL 配置
 
