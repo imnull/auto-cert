@@ -178,7 +178,7 @@ program
 // deploy - 部署证书到 nginx
 program
   .command('deploy')
-  .description('部署证书到 nginx')
+  .description('部署证书到 nginx（需启用 autoDeploy）')
   .requiredOption('-d, --domain <domain>', '域名')
   .option('-u, --upstream <host>', '上游服务器地址', 'localhost')
   .option('-p, --port <port>', '上游服务器端口', '3000')
@@ -186,6 +186,7 @@ program
   .option('--conf-dir <path>', 'nginx 配置目录')
   .option('--no-backup', '不备份现有配置')
   .option('--no-reload', '部署后不重载 nginx')
+  .option('--force', '强制部署（忽略 autoDeploy 配置）')
   .action(async (options) => {
     try {
       const config = await loadConfig(options);
@@ -194,6 +195,38 @@ program
       // 获取域名配置，检查是否为远程模式
       const domainConfig = await autoCert.getDomainConfig(options.domain);
       const isRemote = !!domainConfig.ssh;
+      
+      // 检查 autoDeploy 配置
+      // 优先级: 命令行 --force > 域名配置 autoDeploy > 全局配置 autoDeploy
+      const autoDeploy = options.force || 
+                        domainConfig.autoDeploy || 
+                        config.autoDeploy;
+      
+      if (!autoDeploy) {
+        console.log(chalk.yellow('\n⊙ 自动部署未启用'));
+        console.log(chalk.gray('  当前配置: autoDeploy: false'));
+        console.log(chalk.gray(''));
+        console.log(chalk.blue('启用方法（选择其一）:'));
+        console.log(chalk.white('  1. 命令行添加 --force 强制部署'));
+        console.log(chalk.white('  2. 修改 config/config.yaml:'));
+        console.log(chalk.gray('     autoDeploy: true'));
+        console.log(chalk.white('  3. 修改 config/domains.yaml 添加域名配置:'));
+        console.log(chalk.gray(`     ${options.domain}:`));
+        console.log(chalk.gray('       autoDeploy: true'));
+        console.log(chalk.gray(''));
+        console.log(chalk.blue('手动部署命令:'));
+        const nginxConfDir = isRemote 
+          ? (domainConfig.ssh?.remoteNginxConfDir || '/etc/nginx/conf.d')
+          : (options.confDir || config.nginxConfDir);
+        const certDir = isRemote
+          ? `${domainConfig.ssh?.remoteCertsDir || '/opt/auto-cert/certs'}/${options.domain}`
+          : `${config.certsDir}/${options.domain}`;
+        console.log(chalk.gray(`  证书位置: ${certDir}/cert.pem`));
+        console.log(chalk.gray(`  私钥位置: ${certDir}/cert.key`));
+        console.log(chalk.gray(`  nginx 配置目录: ${nginxConfDir}`));
+        console.log(chalk.gray(`  可使用: npm run nginx:generate -- --domain ${options.domain} 生成配置`));
+        process.exit(0);
+      }
       
       console.log(chalk.blue('\n▶ 部署证书到 nginx'));
       console.log(chalk.gray(`  域名: ${options.domain}`));

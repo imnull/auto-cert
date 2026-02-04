@@ -33,6 +33,11 @@ challengeType: http-01
 nginxConfDir: /etc/nginx/conf.d
 nginxSitesDir: /etc/nginx/sites-enabled
 
+# 是否自动部署 nginx 配置
+# 为 true 时，cert:issue 成功后会自动询问部署
+# 为 false 时，需手动运行 cert:deploy 并加 --force 参数
+autoDeploy: false
+
 # 日志级别: debug/info/warn/error
 logLevel: info
 
@@ -62,6 +67,7 @@ example.com:
   issuedAt: '2026-02-04T10:00:00.000Z'     # 证书签发时间（自动更新）
   email: admin@example.com                 # 申请时使用的邮箱
   webRoot: /var/www/example-com            # 该域名的独立 webRoot（可选）
+  autoDeploy: false                        # 是否自动部署 nginx（可选，默认使用全局配置）
 ```
 
 #### SSH 远程模式
@@ -70,6 +76,9 @@ example.com:
 remote.example.com:
   issuedAt: '2026-02-04T10:00:00.000Z'
   email: admin@example.com
+  
+  # 是否自动部署 nginx（可选，覆盖全局配置）
+  autoDeploy: true
   
   # SSH 远程配置（以下字段除 host 外均为可选）
   ssh:
@@ -91,6 +100,7 @@ remote.example.com:
 remote.example.com:
   issuedAt: ''
   email: admin@example.com
+  autoDeploy: true                         # 启用自动部署
   ssh:
     host: remote.example.com
     remoteWebRoot: /var/www/html
@@ -134,6 +144,14 @@ npm run domain:add -- example.com /var/www/example-com
 **SSH 远程模式优先级**：
 - 如果配置了 `ssh`，优先使用 `ssh.remoteWebRoot`
 - 如果未配置 `ssh.remoteWebRoot`，使用普通优先级
+
+**autoDeploy 配置优先级**：
+| 优先级 | 来源 | 说明 |
+|--------|------|------|
+| 1 | 命令行 `--force` | 强制部署，最高优先级 |
+| 2 | domains.yaml `autoDeploy` | 域名级配置 |
+| 3 | config.yaml `autoDeploy` | 全局配置 |
+| 4 | 默认值 | `false`（安全考虑，默认不自动部署） |
 
 ## 文件规范
 
