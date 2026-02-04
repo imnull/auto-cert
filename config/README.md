@@ -53,17 +53,25 @@ npm run config:init
 
 ### domains.yaml
 
-域名记录文件，记录已管理的域名：
+域名记录文件，记录已管理的域名及其独立配置：
 
 ```yaml
 example.com:
-  issuedAt: '2026-02-04T10:00:00.000Z'  # 记录创建时间
-  email: admin@example.com               # 申请时使用的邮箱
+  issuedAt: '2026-02-04T10:00:00.000Z'     # 记录创建时间
+  email: admin@example.com                 # 申请时使用的邮箱
+  webRoot: /var/www/example-com            # 该域名的独立 webRoot（可选）
 
 www.example.com:
   issuedAt: '2026-02-04T10:30:00.000Z'
   email: admin@example.com
+  webRoot: /var/www/www-example-com        # 每个域名可有不同的 webRoot
 ```
+
+**配置优先级**：
+1. 命令行参数 `--webroot`
+2. 域名配置中的 `webRoot`（domains.yaml）
+3. 全局配置中的 `webRoot`（config.yaml）
+4. 默认值 `/var/www/html`
 
 **生成方式**：
 ```bash
