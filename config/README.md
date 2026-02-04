@@ -70,20 +70,32 @@ example.com:
 remote.example.com:
   issuedAt: '2026-02-04T10:00:00.000Z'
   email: admin@example.com
-  # webRoot: /var/www/html                # SSH 模式下可不设置，使用 ssh.remoteWebRoot
   
-  # SSH 远程配置
+  # SSH 远程配置（以下字段除 host 外均为可选）
   ssh:
-    host: remote.example.com               # 远程服务器地址
-    port: 22                               # SSH 端口（默认 22）
-    username: root                         # 登录用户名
-    privateKey: ~/.ssh/id_rsa              # 私钥路径（默认 ~/.ssh/id_rsa）
-    # 或 password: xxxxxx                  # 密码登录（不推荐）
+    host: remote.example.com               # 【必需】远程服务器地址
+    # port: 22                             # SSH 端口（默认 22）
+    # username: root                       # 登录用户名（默认 root）
+    # privateKey: ~/.ssh/id_rsa            # 私钥路径（默认使用 SSH agent 或 ~/.ssh/id_rsa）
+    # password: xxxxxx                     # 密码登录（不推荐，优先使用密钥）
     
     # 远程路径配置
     remoteWebRoot: /var/www/html           # 远程 web 根目录（HTTP-01 验证用）
-    remoteNginxConfDir: /etc/nginx/conf.d  # 远程 nginx 配置目录（deploy 必需，用于上传配置文件）
+    remoteNginxConfDir: /etc/nginx/conf.d  # 远程 nginx 配置目录（deploy 必需）
     remoteCertsDir: /opt/auto-cert/certs   # 远程证书存放目录（格式: cert.pem + cert.key）
+```
+
+**最简配置示例**（如果你已配置 SSH 免密登录）：
+
+```yaml
+remote.example.com:
+  issuedAt: ''
+  email: admin@example.com
+  ssh:
+    host: remote.example.com
+    remoteWebRoot: /var/www/html
+    remoteNginxConfDir: /etc/nginx/conf.d
+    remoteCertsDir: /opt/auto-cert/certs
 ```
 
 **SSH 模式工作流程**：

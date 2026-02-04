@@ -278,14 +278,12 @@ remote.example.com:
   issuedAt: ''
   email: admin@example.com
   
-  # SSH 远程配置
+  # SSH 远程配置（除 host 外均为可选，使用默认值）
   ssh:
-    host: remote-server.com          # 远程服务器地址
-    port: 22                         # SSH 端口（默认 22）
-    username: root                   # 登录用户名
-    privateKey: ~/.ssh/id_rsa        # 私钥路径（默认 ~/.ssh/id_rsa）
-    # 或使用密码登录（不推荐）
-    # password: your-password
+    host: remote-server.com          # 【必需】远程服务器地址
+    # port: 22                       # SSH 端口（默认 22）
+    # username: root                 # 登录用户名（默认 root）
+    # privateKey: ~/.ssh/id_rsa      # 私钥路径（默认使用 SSH agent 或 ~/.ssh/id_rsa）
     
     # 远程服务器路径配置
     remoteWebRoot: /var/www/html                    # 远程 web 根目录
@@ -314,13 +312,43 @@ remote.example.com:
 
 ### 使用方式
 
-```bash
-# 1. 添加域名时配置 SSH（手动编辑 domains.yaml）
+#### 最简配置（如果你已配置 SSH 免密登录）
 
-# 2. 申请证书（会自动使用 SSH 远程模式）
+```yaml
+# config/domains.yaml
+remote.example.com:
+  issuedAt: ''
+  email: admin@example.com
+  ssh:
+    host: remote-server.com
+    remoteWebRoot: /var/www/html
+    remoteNginxConfDir: /etc/nginx/conf.d
+    remoteCertsDir: /opt/auto-cert/certs
+```
+
+#### 完整配置（自定义选项）
+
+```yaml
+remote.example.com:
+  issuedAt: ''
+  email: admin@example.com
+  ssh:
+    host: remote-server.com
+    port: 2222                    # 非默认端口
+    username: deploy              # 非 root 用户
+    privateKey: ~/.ssh/deploy_key # 指定私钥
+    remoteWebRoot: /var/www/html
+    remoteNginxConfDir: /etc/nginx/conf.d
+    remoteCertsDir: /opt/auto-cert/certs
+```
+
+#### 命令
+
+```bash
+# 申请证书（自动识别 SSH 远程模式）
 npm run cert:issue -- --domain remote.example.com
 
-# 3. 部署到远程 nginx
+# 部署到远程 nginx
 npm run cert:deploy -- --domain remote.example.com
 ```
 
