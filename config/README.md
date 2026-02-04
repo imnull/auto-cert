@@ -23,9 +23,6 @@ email: admin@example.com
 # 是否使用 Let's Encrypt 测试环境
 staging: false
 
-# HTTP-01 验证的根目录
-webRoot: /var/www/html
-
 # 默认验证方式: http-01 或 dns-01
 challengeType: http-01
 
@@ -66,7 +63,6 @@ npm run config:init
 example.com:
   issuedAt: '2026-02-04T10:00:00.000Z'     # 证书签发时间（自动更新）
   email: admin@example.com                 # 申请时使用的邮箱
-  webRoot: /var/www/example-com            # 该域名的独立 webRoot（可选）
   autoDeploy: false                        # 是否自动部署 nginx（可选，默认使用全局配置）
 ```
 
@@ -126,8 +122,8 @@ remote.example.com:
 # 添加本地域名
 npm run domain:add -- example.com
 
-# 添加带独立 webRoot 的域名
-npm run domain:add -- example.com /var/www/example-com
+# 添加域名
+npm run domain:add -- example.com
 
 # SSH 远程域名需要手动编辑 domains.yaml 添加 ssh 配置
 ```
@@ -136,10 +132,9 @@ npm run domain:add -- example.com /var/www/example-com
 
 | 优先级 | 来源 | 说明 |
 |--------|------|------|
-| 1 | 命令行 `--webroot` | 临时覆盖 |
-| 2 | domains.yaml `webRoot` | 该域名的独立配置 |
-| 3 | config.yaml `webRoot` | 全局默认值 |
-| 4 | 内置默认值 | `/var/www/html` |
+| 1 | 命令行参数 | 临时覆盖（如 `--upstream`） |
+| 2 | domains.yaml | 域名级配置 |
+| 3 | config.yaml | 全局默认值 |
 
 **SSH 远程模式优先级**：
 - 如果配置了 `ssh`，优先使用 `ssh.remoteWebRoot`
