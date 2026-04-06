@@ -59,6 +59,11 @@ webRoot: /var/www/html
 npm run cert:issue -- --domain example.com
 
 # DNS-01 验证（支持通配符证书，本地执行）
+
+# 方式 1: 手动模式（不需要 API Key，推荐）
+npm run cert:issue -- --domain "*.example.com" -t dns-01 --dns-provider manual
+
+# 方式 2: 自动模式（需要 Cloudflare API Token）
 npm run cert:issue -- --domain "*.example.com" -t dns-01 --dns-provider cloudflare --dns-token YOUR_API_TOKEN
 
 # 或使用完整命令
@@ -67,8 +72,22 @@ npx auto-cert issue -d example.com
 
 #### 通配符证书申请
 
+**方式 1: 手动模式（不需要 API Key）**
+
 ```bash
-# 申请通配符证书（支持所有三级域名）
+# 申请通配符证书（手动添加 DNS 记录）
+npx auto-cert issue -d "*.clawcave.rockicat.com" \
+  -t dns-01 \
+  --dns-provider manual
+
+# 程序会输出需要添加的 DNS 记录
+# 你手动去 DNS 控制台添加后，按回车继续
+```
+
+**方式 2: 自动模式（需要 Cloudflare API Token）**
+
+```bash
+# 申请通配符证书（自动添加 DNS 记录）
 npx auto-cert issue -d "*.clawcave.rockicat.com" \
   -t dns-01 \
   --dns-provider cloudflare \
@@ -692,18 +711,45 @@ ssh root@remote-server.com "echo '连接成功'"
 
    Let's Encrypt 规定通配符证书（如 `*.example.com`）必须使用 DNS-01 验证：
 
+   **方式 1: 手动模式（不需要 API Key，推荐）**
+
    ```bash
-   # 申请通配符证书
+   npx auto-cert issue -d "*.example.com" \
+     -t dns-01 \
+     --dns-provider manual
+   ```
+
+   工作流程：
+   1. 程序输出需要添加的 DNS 记录信息
+   2. 你手动登录 DNS 控制台添加 TXT 记录
+   3. 等待 1-2 分钟让 DNS 生效
+   4. 按回车继续验证
+   5. 验证成功后程序会提醒你删除记录（可保留）
+
+   **方式 2: 自动模式（需要 API Token）**
+
+   ```bash
    npx auto-cert issue -d "*.example.com" \
      -t dns-01 \
      --dns-provider cloudflare \
      --dns-token YOUR_API_TOKEN
    ```
 
-   **支持的 DNS 服务商**：
+   工作流程：
+   1. 程序自动调用 API 添加 DNS 记录
+   2. 自动等待 DNS 传播（约 30-60 秒）
+   3. 自动完成验证
+   4. 自动清理 DNS 记录
+
+   **支持的 DNS 服务商（自动模式）**：
    - ✅ Cloudflare（已实现）
    - 🚧 阿里云 DNS（待实现）
    - 🚧 AWS Route53（待实现）
+
+   **手动模式**：
+   - ✅ 支持任何 DNS 服务商（Cloudflare、阿里云、腾讯云、Godaddy 等）
+   - ✅ 不需要 API Key
+   - ✅ 适合偶尔申请证书的场景
 
    **Cloudflare API Token 配置**：
    

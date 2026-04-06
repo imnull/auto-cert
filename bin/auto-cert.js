@@ -46,8 +46,8 @@ program
   .option('--staging', '使用 Let\'s Encrypt 测试环境', false)
   .option('-t, --type <type>', '验证类型 (http-01|dns-01)', 'http-01')
   .option('--no-cleanup', '验证完成后不清理验证文件（调试用）')
-  .option('--dns-provider <provider>', 'DNS 服务商 (cloudflare|aliyun|aws)')
-  .option('--dns-token <token>', 'DNS API Token（Cloudflare 推荐）')
+  .option('--dns-provider <provider>', 'DNS 服务商 (cloudflare|manual|aliyun|aws)')
+  .option('--dns-token <token>', 'DNS API Token（Cloudflare 推荐，手动模式不需要）')
   .option('--dns-key <key>', 'DNS API Key（Cloudflare Global API Key）')
   .option('--dns-email <email>', 'DNS 服务商邮箱（Cloudflare 需要）')
   .action(async (options) => {
