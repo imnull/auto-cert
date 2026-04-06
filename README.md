@@ -55,11 +55,30 @@ webRoot: /var/www/html
 ### 2. 申请证书
 
 ```bash
-# HTTP-01 验证（需要 80 端口可访问）
+# HTTP-01 验证（需要 80 端口可访问，需要 SSH 远程服务器）
 npm run cert:issue -- --domain example.com
+
+# DNS-01 验证（支持通配符证书，本地执行）
+npm run cert:issue -- --domain "*.example.com" -t dns-01 --dns-provider cloudflare --dns-token YOUR_API_TOKEN
 
 # 或使用完整命令
 npx auto-cert issue -d example.com
+```
+
+#### 通配符证书申请
+
+```bash
+# 申请通配符证书（支持所有三级域名）
+npx auto-cert issue -d "*.clawcave.rockicat.com" \
+  -t dns-01 \
+  --dns-provider cloudflare \
+  --dns-token YOUR_CLOUDFLARE_API_TOKEN
+
+# 申请多域名 SAN 证书（逗号分隔）
+npx auto-cert issue -d "example.com,*.example.com" \
+  -t dns-01 \
+  --dns-provider cloudflare \
+  --dns-token YOUR_API_TOKEN
 ```
 
 ### 3. 部署到 nginx
@@ -140,6 +159,9 @@ logLevel: info
 dnsProvider: cloudflare
 dnsCredentials:
   apiToken: your-api-token
+  # 或使用 Global API Key + 邮箱
+  # apiKey: your-global-api-key
+  # email: your-cloudflare-email@example.com
 ```
 
 配置优先级：命令行参数 > 环境变量 > 配置文件 > 默认值
@@ -664,9 +686,55 @@ ssh root@remote-server.com "echo '连接成功'"
 
 2. **端口**：
    - HTTP-01 验证需要服务器 80 端口可访问
-   - 或使用 DNS-01 验证（需要 DNS 服务商 API）
+   - DNS-01 验证需要 DNS 服务商 API 凭证
 
-3. **HTTP-01 验证流程**：
+3. **通配符证书**：
+
+   Let's Encrypt 规定通配符证书（如 `*.example.com`）必须使用 DNS-01 验证：
+
+   ```bash
+   # 申请通配符证书
+   npx auto-cert issue -d "*.example.com" \
+     -t dns-01 \
+     --dns-provider cloudflare \
+     --dns-token YOUR_API_TOKEN
+   ```
+
+   **支持的 DNS 服务商**：
+   - ✅ Cloudflare（已实现）
+   - 🚧 阿里云 DNS（待实现）
+   - 🚧 AWS Route53（待实现）
+
+   **Cloudflare API Token 配置**：
+   
+   1. 登录 Cloudflare 控制台
+   2. 进入 "My Profile" -> "API Tokens"
+   3. 创建自定义 token，权限：
+      - Zone -> DNS -> Edit
+      - Zone -> Zone -> Read
+   4. 复制 token 并在命令中使用
+
+   **工作原理**：
+
+   ```
+   1. auto-cert 创建 ACME 订单
+      → 指定域名: *.example.com
+
+   2. Let's Encrypt 返回 DNS 挑战
+      → 需要添加 TXT 记录: _acme-challenge.example.com
+      → 记录值: xxxxxxxxxxxxxxxx
+
+   3. auto-cert 调用 DNS API 自动添加记录
+      → 等待 DNS 传播（约 30-60 秒）
+
+   4. Let's Encrypt 验证 DNS 记录
+      → 验证成功 → 颁发证书
+      → 验证失败 → 重试或失败
+
+   5. auto-cert 自动清理 DNS 记录
+   ```
+
+4. **HTTP-01 验证流程**：
 
    HTTP-01 验证需要 Let's Encrypt 服务器能够访问你的服务器：
 

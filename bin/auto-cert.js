@@ -41,42 +41,52 @@ async function loadConfig(options) {
 program
   .command('issue')
   .description('申请新的 SSL 证书')
-  .requiredOption('-d, --domain <domain>', '域名')
+  .requiredOption('-d, --domain <domain>', '域名（支持通配符，如 *.example.com）')
   .option('-e, --email <email>', '联系邮箱')
   .option('--staging', '使用 Let\'s Encrypt 测试环境', false)
   .option('-t, --type <type>', '验证类型 (http-01|dns-01)', 'http-01')
   .option('--no-cleanup', '验证完成后不清理验证文件（调试用）')
   .option('--dns-provider <provider>', 'DNS 服务商 (cloudflare|aliyun|aws)')
+  .option('--dns-token <token>', 'DNS API Token（Cloudflare 推荐）')
+  .option('--dns-key <key>', 'DNS API Key（Cloudflare Global API Key）')
+  .option('--dns-email <email>', 'DNS 服务商邮箱（Cloudflare 需要）')
   .action(async (options) => {
     try {
       const config = await loadConfig(options);
       const autoCert = new AutoCert(config);
-      
+
       console.log(chalk.blue('\n▶ 开始申请证书'));
       console.log(chalk.gray(`  域名: ${options.domain}`));
       console.log(chalk.gray(`  验证方式: ${options.type}`));
       console.log(chalk.gray(`  环境: ${options.staging ? 'Staging (测试)' : 'Production (生产)'}`));
-      
+
+      // 构建 DNS 凭证
+      const dnsCredentials = {};
+      if (options.dnsToken) dnsCredentials.apiToken = options.dnsToken;
+      if (options.dnsKey) dnsCredentials.apiKey = options.dnsKey;
+      if (options.dnsEmail) dnsCredentials.email = options.dnsEmail;
+
       const result = await autoCert.issue(options.domain, {
         challengeType: options.type,
         dnsProvider: options.dnsProvider,
+        dnsCredentials: dnsCredentials,
         cleanup: options.cleanup !== false
       });
-      
+
       console.log(chalk.green('\n✔ 证书申请成功'));
       console.log(chalk.gray(`  私钥: ${result.privateKey}`));
       console.log(chalk.gray(`  证书: ${result.cert}`));
       console.log(chalk.gray(`  完整链: ${result.fullchain}`));
-      
+
       // 询问是否部署
       if (!options.noDeploy) {
         const { deploy } = await require('inquirer').prompt([{
           type: 'confirm',
           name: 'deploy',
           message: '是否立即部署到 nginx?',
-          default: true
+          default: false
         }]);
-        
+
         if (deploy) {
           await program.parseAsync(['', '', 'deploy', '-d', options.domain]);
         }
